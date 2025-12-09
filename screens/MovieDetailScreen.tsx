@@ -98,32 +98,36 @@ export default function MovieDetailScreen() {
                 </View>
 
                 {/* Ratings */}
-                <View style={styles.ratingsContainer}>
-                    <View style={styles.ratingCard}>
-                        <Text style={styles.ratingLabel}>IMDB</Text>
-                        <Text style={styles.ratingValue}>
-                            {movie.ratings.imdb || 'N/A'}
-                        </Text>
+                {movie.ratings && (
+                    <View style={styles.ratingsContainer}>
+                        <View style={styles.ratingCard}>
+                            <Text style={styles.ratingLabel}>IMDB</Text>
+                            <Text style={styles.ratingValue}>
+                                {movie.ratings.imdb || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={styles.ratingCard}>
+                            <Text style={styles.ratingLabel}>Rotten Tomatoes</Text>
+                            <Text style={styles.ratingValue}>
+                                {movie.ratings.rotten_critics || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={styles.ratingCard}>
+                            <Text style={styles.ratingLabel}>Audience</Text>
+                            <Text style={styles.ratingValue}>
+                                {movie.ratings.rotten_audience || 'N/A'}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={styles.ratingCard}>
-                        <Text style={styles.ratingLabel}>Rotten Tomatoes</Text>
-                        <Text style={styles.ratingValue}>
-                            {movie.ratings.rotten_critics || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={styles.ratingCard}>
-                        <Text style={styles.ratingLabel}>Audience</Text>
-                        <Text style={styles.ratingValue}>
-                            {movie.ratings.rotten_audience || 'N/A'}
-                        </Text>
-                    </View>
-                </View>
+                )}
 
                 {/* Plot */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Plot</Text>
-                    <Text style={styles.plotText}>{movie.plot}</Text>
-                </View>
+                {movie.plot && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Plot</Text>
+                        <Text style={styles.plotText}>{movie.plot}</Text>
+                    </View>
+                )}
 
                 {/* Cast & Crew */}
                 {movie.directors_abridged && movie.directors_abridged.length > 0 && (

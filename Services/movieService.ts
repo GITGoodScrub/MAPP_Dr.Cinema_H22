@@ -39,3 +39,22 @@ export const getTheaters = async (): Promise<Theater[]> => {
         throw error;
     }
 };
+
+/**
+ * Fetches upcoming movies
+ */
+export const getUpcomingMovies = async (): Promise<Movie[]> => {
+    try {
+        const response = await authenticatedFetch('/upcoming');
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch upcoming movies: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching upcoming movies:', error);
+        throw error;
+    }
+};
