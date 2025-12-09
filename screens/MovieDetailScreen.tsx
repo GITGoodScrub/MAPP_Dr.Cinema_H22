@@ -36,8 +36,23 @@ export default function MovieDetailScreen() {
         );
     }
 
-    const handleTrailerPress = (trailerUrl: string) => {
-        Linking.openURL(trailerUrl);
+    const handleTrailerPress = (trailer: any) => {
+        // Extract URL from trailer object structure
+        let url = null;
+        
+        if (typeof trailer === 'string') {
+            url = trailer;
+        } else if (trailer.results && trailer.results.length > 0) {
+            url = trailer.results[0].url;
+        } else if (trailer.url) {
+            url = trailer.url;
+        }
+        
+        if (url && typeof url === 'string') {
+            Linking.openURL(url);
+        } else {
+            console.log('No valid trailer URL found:', trailer);
+        }
     };
 
     const handleTicketPress = (url: string) => {
@@ -137,7 +152,7 @@ export default function MovieDetailScreen() {
                             <TouchableOpacity
                                 key={index}
                                 style={styles.trailerButton}
-                                onPress={() => handleTrailerPress(trailer.results?.[0]?.url || trailer)}
+                                onPress={() => handleTrailerPress(trailer)}
                             >
                                 <Text style={styles.trailerButtonText}>
                                     ▶ Watch Trailer {movie.trailers.length > 1 ? `${index + 1}` : ''}
