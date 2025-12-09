@@ -51,3 +51,107 @@ export const formatDuration = (minutes: number): string => {
     }
     return `${hours}h ${mins}m`;
 };
+
+export interface MovieFilters {
+    searchText?: string;
+    minImdbRating?: number;
+    minRottenRating?: number;
+    showAfter?: string; // Time in HH:MM format
+    showBefore?: string; // Time in HH:MM format
+    actor?: string;
+    director?: string;
+    pgRating?: string;
+}
+
+/**
+ * Filters movies based on provided criteria
+ */
+export const filterMovies = (movies: Movie[], filters: MovieFilters): Movie[] => {
+    return movies.filter(movie => {
+        // Title search
+        if (filters.searchText) {
+            const searchLower = filters.searchText.toLowerCase();
+            if (!movie.title.toLowerCase().includes(searchLower)) {
+                return false;
+            }
+        }
+
+        // IMDB rating
+        if (filters.minImdbRating !== undefined) {
+            const imdbRating = parseFloat(movie.ratings.imdb);
+            if (isNaN(imdbRating) || imdbRating < filters.minImdbRating) {
+                return false;
+            }
+        }
+
+        // Rotten Tomatoes rating
+        if (filters.minRottenRating !== undefined) {
+            const rottenRating = parseFloat(movie.ratings.rotten_critics);
+            if (isNaN(rottenRating) || rottenRating < filters.minRottenRating) {
+                return false;
+            }
+        }
+
+        // Showtime range
+        if (filters.showAfter || filters.showBefore) {
+            let hasValidShowtime = false;
+            
+            for (const showtime of movie.showtimes) {
+                for (const schedule of showtime.schedule) {
+                    const showTime = schedule.time;
+                    
+                    if (filters.showAfter && showTime < filters.showAfter) {
+                        continue;
+                    }
+                    if (filters.showBefore && showTime > filters.showBefore) {
+                        continue;
+                    }
+                    
+                    hasValidShowtime = true;
+                    break;
+                }
+                if (hasValidShowtime) break;
+            }
+            
+            if (!hasValidShowtime) {
+                return false;
+            }
+        }
+
+        // Actor search
+        if (filters.actor) {
+            const actorLower = filters.actor.toLowerCase();
+            const hasActor = movie.actors_abridged.some(a => 
+                a.name.toLowerCase().includes(actorLower)
+            );
+            if (!hasActor) {
+                return false;
+            }
+        }
+
+        // Director search
+        if (filters.director) {
+            const directorLower = filters.director.toLowerCase();
+            const hasDirector = movie.directors_abridged.some(d => 
+                d.name.toLowerCase().includes(directorLower)
+            );
+            if (!hasDirector) {
+                return false;
+            }
+        }
+
+        // PG rating
+        if (filters.pgRating) {
+            if (!movie.certificate || !movie.certificate.is) {
+                return false;
+            }
+            // Extract just the age number/letter from certificate (e.g., "12" from "12 ára")
+            const certValue = movie.certificate.is.split(' ')[0];
+            if (certValue !== filters.pgRating) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+};
