@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,7 @@ import {
     Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Movie } from '../Services/types';
+import { Movie, addFavorite, removeFavorite, isFavorite } from '../Services';
 import { formatDuration } from '../Services/formatters';
 
 const { width } = Dimensions.get('window');
@@ -21,6 +21,39 @@ export default function MovieDetailScreen() {
     
     // Parse the movie object from params
     const movie: Movie = params.movie ? JSON.parse(params.movie as string) : null;
+    
+    const [isFav, setIsFav] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (movie) {
+            checkFavorite();
+        }
+    }, [movie]);
+
+    const checkFavorite = async () => {
+        if (movie) {
+            const favStatus = await isFavorite(movie._id);
+            setIsFav(favStatus);
+            setLoading(false);
+        }
+    };
+
+    const toggleFavorite = async () => {
+        if (!movie) return;
+        
+        try {
+            if (isFav) {
+                await removeFavorite(movie._id);
+                setIsFav(false);
+            } else {
+                await addFavorite(movie);
+                setIsFav(true);
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
+    };
 
     if (!movie) {
         return (
@@ -68,6 +101,15 @@ export default function MovieDetailScreen() {
                     style={styles.poster}
                     resizeMode="cover"
                 />
+                <TouchableOpacity
+                    style={styles.favoriteButton}
+                    onPress={toggleFavorite}
+                    disabled={loading}
+                >
+                    <Text style={styles.favoriteIcon}>
+                        {isFav ? '❤️' : '🤍'}
+                    </Text>
+                </TouchableOpacity>
                 <View style={styles.posterOverlay}>
                     <Text style={styles.title}>{movie.title}</Text>
                     <Text style={styles.year}>{movie.year}</Text>
@@ -232,6 +274,26 @@ const styles = StyleSheet.create({
     poster: {
         width: '100%',
         height: '100%',
+    },
+    favoriteButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+        zIndex: 10,
+    },
+    favoriteIcon: {
+        fontSize: 32,
     },
     posterOverlay: {
         position: 'absolute',
