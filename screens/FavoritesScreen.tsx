@@ -14,39 +14,34 @@ import { router, useFocusEffect } from 'expo-router';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams, OpacityDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-swipeable-item';
-import { Movie, getFavorites, removeFavorite, reorderFavorites } from '../Services';
+import { Movie } from '../Services';
 import { MovieCard } from '../components/Movie';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { loadFavoritesFromStorage, removeFavorite, reorderFavorites } from '../store/favoritesSlice';
 
 export default function FavoritesScreen() {
-    const [favorites, setFavorites] = useState<Movie[]>([]);
+    const dispatch = useAppDispatch();
+    const { favorites, loading } = useAppSelector((state) => state.favorites);
+    
+    const [localFavorites, setLocalFavorites] = useState<Movie[]>([]);
     const [originalFavorites, setOriginalFavorites] = useState<Movie[]>([]);
-    const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
     const itemRefs = useRef(new Map());
-    const [swipingItemId, setSwipingItemId] = useState<string | null>(null);
 
     // Reload favorites when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            loadFavorites();
+            dispatch(loadFavoritesFromStorage());
             setEditMode(false);
             setHasChanges(false);
-        }, [])
+        }, [dispatch])
     );
 
-    const loadFavorites = async () => {
-        setLoading(true);
-        try {
-            const data = await getFavorites();
-            setFavorites(data);
-            setOriginalFavorites(data);
-        } catch (error) {
-            console.error('Error loading favorites:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        setLocalFavorites(favorites);
+        setOriginalFavorites(favorites);
+    }, [favorites]);
 
     const handleMoviePress = (movie: Movie) => {
         if (editMode) return; // Disable navigation in edit mode
@@ -57,12 +52,6 @@ export default function FavoritesScreen() {
                 movie: JSON.stringify(movie)
             }
         });
-    };
-
-    const handleLongPress = () => {
-        if (!editMode) {
-            setEditMode(true);
-        }
     };
 
     const handleRemove = async (movieId: string) => {
@@ -84,15 +73,11 @@ export default function FavoritesScreen() {
                 {
                     text: 'Remove',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await removeFavorite(movieId);
-                            const updated = favorites.filter(m => m._id !== movieId);
-                            setFavorites(updated);
-                            setOriginalFavorites(updated);
-                        } catch (error) {
-                            console.error('Error removing favorite:', error);
-                        }
+                    onPress: () => {
+                        dispatch(removeFavorite(movieId));
+                        const updated = localFavorites.filter(m => m._id !== movieId);
+                        setLocalFavorites(updated);
+                        setOriginalFavorites(updated);
                     },
                 },
             ]
@@ -100,23 +85,18 @@ export default function FavoritesScreen() {
     };
 
     const handleDragEnd = ({ data }: { data: Movie[] }) => {
-        setFavorites(data);
+        setLocalFavorites(data);
         
         // Check if order changed
         const orderChanged = data.some((movie, index) => movie._id !== originalFavorites[index]?._id);
         setHasChanges(orderChanged);
     };
 
-    const handleConfirm = async () => {
-        try {
-            await reorderFavorites(favorites);
-            setOriginalFavorites(favorites);
-            setEditMode(false);
-            setHasChanges(false);
-        } catch (error) {
-            console.error('Error saving order:', error);
-            Alert.alert('Error', 'Failed to save changes');
-        }
+    const handleConfirm = () => {
+        dispatch(reorderFavorites(localFavorites));
+        setOriginalFavorites(localFavorites);
+        setEditMode(false);
+        setHasChanges(false);
     };
 
     const handleCancel = () => {
@@ -133,7 +113,7 @@ export default function FavoritesScreen() {
                         text: 'Discard',
                         style: 'destructive',
                         onPress: () => {
-                            setFavorites(originalFavorites);
+                            setLocalFavorites(originalFavorites);
                             setEditMode(false);
                             setHasChanges(false);
                         },
@@ -232,14 +212,14 @@ export default function FavoritesScreen() {
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Favorites</Text>
                     <Text style={styles.subtitle}>
-                        {favorites.length} {favorites.length === 1 ? 'movie' : 'movies'}
+                        {localFavorites.length} {localFavorites.length === 1 ? 'movie' : 'movies'}
                     </Text>
                     {editMode && (
                         <Text style={styles.editModeText}>Drag to reorder</Text>
                     )}
                 </View>
 
-                {favorites.length === 0 ? (
+                {localFavorites.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyIcon}>💔</Text>
                         <Text style={styles.emptyTitle}>No Favorites Yet</Text>
@@ -250,7 +230,7 @@ export default function FavoritesScreen() {
                 ) : (
                     <>
                         <DraggableFlatList
-                            data={favorites}
+                            data={localFavorites}
                             keyExtractor={(item) => item._id}
                             renderItem={renderMovieItem}
                             onDragEnd={handleDragEnd}

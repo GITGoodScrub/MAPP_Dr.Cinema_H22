@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -8,33 +8,22 @@ import {
     SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Theater, getTheaters } from '../Services';
+import { Theater } from '../Services';
 import { CinemaCard } from '../components/Cinema';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchCinemas } from '../store/cinemasSlice';
 
 export default function CinemasScreen() {
-    const [cinemas, setCinemas] = useState<Theater[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const dispatch = useAppDispatch();
+    const { cinemas, loading, error } = useAppSelector((state) => state.cinemas);
+    
+    const sortedCinemas = useMemo(() => {
+        return [...cinemas].sort((a, b) => a.name.localeCompare(b.name));
+    }, [cinemas]);
 
     useEffect(() => {
-        loadCinemas();
-    }, []);
-
-    const loadCinemas = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getTheaters();
-            // Sort alphabetically by name
-            const sorted = data.sort((a, b) => a.name.localeCompare(b.name));
-            setCinemas(sorted);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load cinemas');
-            console.error('Error loading cinemas:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        dispatch(fetchCinemas());
+    }, [dispatch]);
 
     const handleCinemaPress = (cinema: Theater) => {
         router.push({
@@ -71,12 +60,12 @@ export default function CinemasScreen() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Cinemas</Text>
                 <Text style={styles.subtitle}>
-                    {cinemas.length} {cinemas.length === 1 ? 'cinema' : 'cinemas'}
+                    {sortedCinemas.length} {sortedCinemas.length === 1 ? 'cinema' : 'cinemas'}
                 </Text>
             </View>
 
             <FlatList
-                data={cinemas}
+                data={sortedCinemas}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                     <CinemaCard 

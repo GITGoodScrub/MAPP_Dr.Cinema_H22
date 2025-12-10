@@ -1,34 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SectionList, ActivityIndicator, SafeAreaView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { Movie, getMovies, groupMoviesByCinema, filterMovies, MovieFilters } from '../Services';
+import { Movie, groupMoviesByCinema, filterMovies, MovieFilters } from '../Services';
 import { MovieCard } from '../components/Movie';
 import { FilterModal } from '../components/FilterModal';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchMovies } from '../store/moviesSlice';
 
 export default function HomeScreen() {
-    const [movies, setMovies] = useState<Movie[]>([]);
+    const dispatch = useAppDispatch();
+    const { movies, loading, error } = useAppSelector((state) => state.movies);
+    
     const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
     const [groupedMovies, setGroupedMovies] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<MovieFilters>({});
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [activeFilterCount, setActiveFilterCount] = useState(0);
 
     useEffect(() => {
-        loadMovies();
-    }, []);
+        dispatch(fetchMovies());
+    }, [dispatch]);
 
-    const loadMovies = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getMovies();
-            setMovies(data);
-            setFilteredMovies(data);
+    useEffect(() => {
+        if (movies.length > 0) {
+            setFilteredMovies(movies);
             
             // Group movies by cinema
-            const grouped = groupMoviesByCinema(data);
+            const grouped = groupMoviesByCinema(movies);
             
             // Convert to SectionList format
             const sections = grouped.map(group => ({
@@ -38,13 +36,8 @@ export default function HomeScreen() {
             }));
             
             setGroupedMovies(sections);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load movies');
-            console.error('Error loading movies:', err);
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [movies]);
 
     const applyFilters = (newFilters: MovieFilters) => {
         setFilters(newFilters);
