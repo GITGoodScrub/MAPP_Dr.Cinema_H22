@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     header: {
-        backgroundColor: '#fff',
+        backgroundColor: '#383d40',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#f1f1f1ff',
     },
     filterButton: {
         flexDirection: 'row',
