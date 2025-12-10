@@ -10,6 +10,7 @@ import {
     Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Movie } from '../Services';
 import { formatDuration } from '../Services/formatters';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -32,8 +33,10 @@ export default function MovieDetailScreen() {
         if (!movie) return;
         
         if (isFav) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch(removeFavorite(movie._id));
         } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch(addFavorite(movie));
         }
     };

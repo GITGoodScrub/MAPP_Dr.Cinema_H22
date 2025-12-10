@@ -8,9 +8,12 @@ import {
     SafeAreaView,
     Alert,
     Animated,
+    RefreshControl,
+    ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams, OpacityDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-swipeable-item';
@@ -27,23 +30,50 @@ export default function FavoritesScreen() {
     const [originalFavorites, setOriginalFavorites] = useState<Movie[]>([]);
     const [editMode, setEditMode] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [isManualRefresh, setIsManualRefresh] = useState(false);
     const itemRefs = useRef(new Map());
+    const hasLoadedRef = useRef(false);
+    const scrollOffsetRef = useRef(0);
+    const isRefreshingRef = useRef(false);
 
-    // Reload favorites when screen comes into focus
+    // Load favorites only once on mount
+    useEffect(() => {
+        if (!hasLoadedRef.current) {
+            dispatch(loadFavoritesFromStorage());
+            hasLoadedRef.current = true;
+        }
+    }, [dispatch]);
+
+    // Reset edit mode when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            dispatch(loadFavoritesFromStorage());
             setEditMode(false);
             setHasChanges(false);
-        }, [dispatch])
+        }, [])
     );
 
-    useEffect(() => {
-        setLocalFavorites(favorites);
-        setOriginalFavorites(favorites);
-    }, [favorites]);
+    const onRefresh = useCallback(async () => {
+        if (editMode) return; // Don't refresh during edit mode
+        setIsManualRefresh(true);
+        try {
+            await dispatch(loadFavoritesFromStorage());
+            // Random delay between 500-1000ms for favorites (faster than other screens)
+            const randomDelay = Math.floor(Math.random() * 500) + 500;
+            await new Promise(resolve => setTimeout(resolve, randomDelay));
+        } finally {
+            setIsManualRefresh(false);
+            isRefreshingRef.current = false;
+        }
+    }, [dispatch, editMode]);
 
-    const handleMoviePress = (movie: Movie) => {
+    useEffect(() => {
+        if (!isManualRefresh) {
+            setLocalFavorites(favorites);
+            setOriginalFavorites(favorites);
+        }
+    }, [favorites, isManualRefresh]);
+
+    const handleMoviePress = useCallback((movie: Movie) => {
         if (editMode) return; // Disable navigation in edit mode
         
         router.push({
@@ -52,9 +82,9 @@ export default function FavoritesScreen() {
                 movie: JSON.stringify(movie)
             }
         });
-    };
+    }, [editMode]);
 
-    const handleRemove = async (movieId: string) => {
+    const handleRemove = useCallback(async (movieId: string) => {
         Alert.alert(
             'Remove from Favorites',
             'Are you sure you want to remove this movie from your favorites?',
@@ -82,24 +112,24 @@ export default function FavoritesScreen() {
                 },
             ]
         );
-    };
+    }, [dispatch, localFavorites]);
 
-    const handleDragEnd = ({ data }: { data: Movie[] }) => {
+    const handleDragEnd = useCallback(({ data }: { data: Movie[] }) => {
         setLocalFavorites(data);
         
         // Check if order changed
         const orderChanged = data.some((movie, index) => movie._id !== originalFavorites[index]?._id);
         setHasChanges(orderChanged);
-    };
+    }, [originalFavorites]);
 
-    const handleConfirm = () => {
+    const handleConfirm = useCallback(() => {
         dispatch(reorderFavorites(localFavorites));
         setOriginalFavorites(localFavorites);
         setEditMode(false);
         setHasChanges(false);
-    };
+    }, [dispatch, localFavorites]);
 
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         if (hasChanges) {
             Alert.alert(
                 'Discard Changes',
@@ -124,19 +154,23 @@ export default function FavoritesScreen() {
             setEditMode(false);
             setHasChanges(false);
         }
-    };
+    }, [hasChanges, originalFavorites]);
 
-    const renderUnderlayLeft = () => (
+    const renderUnderlayLeft = useCallback(() => (
         <View style={styles.underlayContainer}>
             <Ionicons name="trash-outline" size={36} color="white" />
         </View>
-    );
+    ), []);
 
     const renderMovieItem = ({ item, drag, isActive }: RenderItemParams<Movie>) => {
+        const swipeHapticFiredRef = useRef(false);
+        
         const handleSwipe = () => {
+            handleRemove(item._id);
+            // Reset after a delay
             setTimeout(() => {
-                handleRemove(item._id);
-            }, 100);
+                swipeHapticFiredRef.current = false;
+            }, 300);
         };
 
         return (
@@ -155,8 +189,10 @@ export default function FavoritesScreen() {
                     snapPointsLeft={[120]}
                     activationThreshold={15}
                     swipeEnabled={!editMode}
-                    onChange={({ openDirection }) => {
-                        if (openDirection === 'left') {
+                    onChange={({ openDirection, snapPoint }) => {
+                        if (openDirection === 'left' && snapPoint === 120 && !swipeHapticFiredRef.current) {
+                            swipeHapticFiredRef.current = true;
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             handleSwipe();
                         }
                     }}
@@ -165,22 +201,24 @@ export default function FavoritesScreen() {
                     <TouchableOpacity
                         style={styles.movieCardWrapper}
                         onPress={() => !editMode && handleMoviePress(item)}
-                        onPressIn={editMode ? drag : undefined}
+                        onPressIn={editMode ? () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); drag(); } : undefined}
                         onLongPress={() => {
                             if (!editMode) {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                 setEditMode(true);
                             }
                         }}
                         delayLongPress={500}
-                        disabled={isActive}
+                        delayPressIn={0}
+                        delayPressOut={0}
+                        disabled={isActive || isManualRefresh}
                         activeOpacity={editMode ? 0.8 : 0.7}
                     >
-                        <View pointerEvents="none">
-                            <MovieCard 
-                                movie={item}
-                                onPress={() => {}}
-                            />
-                        </View>
+                        <MovieCard 
+                            movie={item}
+                            onPress={() => {}}
+                            disableTouch={true}
+                        />
                     </TouchableOpacity>
                     
                     
@@ -195,7 +233,7 @@ export default function FavoritesScreen() {
         );
     };
 
-    if (loading) {
+    if (loading || isManualRefresh) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.centerContainer}>
@@ -220,13 +258,25 @@ export default function FavoritesScreen() {
                 </View>
 
                 {localFavorites.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyIcon}>💔</Text>
-                        <Text style={styles.emptyTitle}>No Favorites Yet</Text>
-                        <Text style={styles.emptyText}>
-                            Add movies to your favorites by tapping the heart icon on movie details
-                        </Text>
-                    </View>
+                    <ScrollView
+                        contentContainerStyle={{ flex: 1 }}
+                        onScroll={(e) => {
+                            // Trigger refresh when scrolled to top and pulled down
+                            if (e.nativeEvent.contentOffset.y < -100 && !isManualRefresh && !loading && !editMode) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                onRefresh();
+                            }
+                        }}
+                        scrollEventThrottle={16}
+                    >
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyIcon}>💔</Text>
+                            <Text style={styles.emptyTitle}>No Favorites Yet</Text>
+                            <Text style={styles.emptyText}>
+                                Add movies to your favorites by tapping the heart icon on movie details
+                            </Text>
+                        </View>
+                    </ScrollView>
                 ) : (
                     <>
                         <DraggableFlatList
@@ -235,6 +285,19 @@ export default function FavoritesScreen() {
                             renderItem={renderMovieItem}
                             onDragEnd={handleDragEnd}
                             contentContainerStyle={styles.listContent}
+                            activationDistance={10}
+                            removeClippedSubviews={true}
+                            maxToRenderPerBatch={5}
+                            windowSize={3}
+                            onScrollOffsetChange={(offset) => {
+                                scrollOffsetRef.current = offset;
+                                // Only trigger refresh when pulled down from top
+                                if (offset < -100 && !isRefreshingRef.current && !isManualRefresh && !loading && !editMode) {
+                                    isRefreshingRef.current = true;
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    onRefresh();
+                                }
+                            }}
                         />
                         
                         {editMode && (

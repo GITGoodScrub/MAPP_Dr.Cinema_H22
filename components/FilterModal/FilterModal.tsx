@@ -9,6 +9,7 @@ import {
     ScrollView,
     SafeAreaView,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { MovieFilters } from '../../Services/formatters';
 
 interface FilterModalProps {
@@ -41,10 +42,12 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
             director: director.trim() || undefined,
             pgRating: pgRating || undefined,
         };
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onApply(filters);
     };
 
     const handleClear = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setSearchText('');
         setMinImdbRating('');
         setMinRottenRating('');

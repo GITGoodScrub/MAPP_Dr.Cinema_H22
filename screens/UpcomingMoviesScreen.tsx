@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,39 +6,52 @@ import {
     FlatList,
     ActivityIndicator,
     SafeAreaView,
+    RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Movie } from '../Services';
 import { MovieCard } from '../components/Movie';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchUpcomingMovies } from '../store/upcomingMoviesSlice';
+import { selectSortedUpcomingMovies, selectUpcomingMoviesLoading, selectUpcomingMoviesError } from '../store/selectors';
 
 export default function UpcomingMoviesScreen() {
     const dispatch = useAppDispatch();
-    const { upcomingMovies, loading, error } = useAppSelector((state) => state.upcomingMovies);
-    
-    const sortedMovies = useMemo(() => {
-        return [...upcomingMovies].sort((a, b) => {
-            const dateA = a.omdb?.[0]?.Released ? new Date(a.omdb[0].Released).getTime() : 0;
-            const dateB = b.omdb?.[0]?.Released ? new Date(b.omdb[0].Released).getTime() : 0;
-            return dateA - dateB;
-        });
-    }, [upcomingMovies]);
+    const sortedMovies = useAppSelector(selectSortedUpcomingMovies);
+    const loading = useAppSelector(selectUpcomingMoviesLoading);
+    const error = useAppSelector(selectUpcomingMoviesError);
+    const [isManualRefresh, setIsManualRefresh] = useState(false);
+    const hasLoadedRef = useRef(false);
 
     useEffect(() => {
-        dispatch(fetchUpcomingMovies());
+        if (!hasLoadedRef.current && sortedMovies.length === 0) {
+            dispatch(fetchUpcomingMovies());
+            hasLoadedRef.current = true;
+        }
+    }, [dispatch, sortedMovies.length]);
+
+    const onRefresh = useCallback(async () => {
+        setIsManualRefresh(true);
+        await dispatch(fetchUpcomingMovies()).unwrap().catch(() => {});
+        // Random delay between 500-2500ms for better perceived value
+        const randomDelay = Math.floor(Math.random() * 2000) + 500;
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
+        setIsManualRefresh(false);
     }, [dispatch]);
 
-    const handleMoviePress = (movie: Movie) => {
+    const handleMoviePress = useCallback((movie: Movie) => {
         router.push({
             pathname: '/movie-detail' as any,
             params: {
                 movie: JSON.stringify(movie)
             }
         });
-    };
+    }, []);
 
-    const renderMovieItem = ({ item }: { item: Movie }) => {
+    const keyExtractor = useCallback((item: Movie) => item._id, []);
+
+    const renderMovieItem = useCallback(({ item }: { item: Movie }) => {
         const releaseDate = item.omdb?.[0]?.Released;
         return (
             <View>
@@ -53,9 +66,9 @@ export default function UpcomingMoviesScreen() {
                 )}
             </View>
         );
-    };
+    }, [handleMoviePress]);
 
-    if (loading) {
+    if (loading || isManualRefresh) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.centerContainer}>
@@ -87,9 +100,22 @@ export default function UpcomingMoviesScreen() {
 
             <FlatList
                 data={sortedMovies}
-                keyExtractor={(item) => item._id}
+                keyExtractor={keyExtractor}
                 renderItem={renderMovieItem}
                 contentContainerStyle={styles.listContent}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={8}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={8}
+                windowSize={5}
+                onScroll={(e) => {
+                    // Trigger refresh when scrolled to top and pulled down
+                    if (e.nativeEvent.contentOffset.y < -100 && !isManualRefresh && !loading) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        onRefresh();
+                    }
+                }}
+                scrollEventThrottle={16}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No upcoming movies available</Text>

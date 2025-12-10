@@ -7,7 +7,7 @@ interface CinemaCardProps {
     onPress: (cinema: Theater) => void;
 }
 
-export default function CinemaCard({ cinema, onPress }: CinemaCardProps) {
+const CinemaCard = React.memo(({ cinema, onPress }: CinemaCardProps) => {
     const handleWebsitePress = (e: any) => {
         e.stopPropagation();
         if (cinema.website) {
@@ -45,7 +45,11 @@ export default function CinemaCard({ cinema, onPress }: CinemaCardProps) {
             )}
         </TouchableOpacity>
     );
-}
+}, (prevProps, nextProps) => {
+    return prevProps.cinema.id === nextProps.cinema.id && prevProps.onPress === nextProps.onPress;
+});
+
+export default CinemaCard;
 
 const styles = StyleSheet.create({
     card: {

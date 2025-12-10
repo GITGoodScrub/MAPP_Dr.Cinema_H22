@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,35 +6,59 @@ import {
     FlatList,
     ActivityIndicator,
     SafeAreaView,
+    RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Theater } from '../Services';
 import { CinemaCard } from '../components/Cinema';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchCinemas } from '../store/cinemasSlice';
+import { selectSortedCinemas, selectCinemasLoading, selectCinemasError } from '../store/selectors';
 
 export default function CinemasScreen() {
     const dispatch = useAppDispatch();
-    const { cinemas, loading, error } = useAppSelector((state) => state.cinemas);
-    
-    const sortedCinemas = useMemo(() => {
-        return [...cinemas].sort((a, b) => a.name.localeCompare(b.name));
-    }, [cinemas]);
+    const sortedCinemas = useAppSelector(selectSortedCinemas);
+    const loading = useAppSelector(selectCinemasLoading);
+    const error = useAppSelector(selectCinemasError);
+    const [isManualRefresh, setIsManualRefresh] = useState(false);
+    const hasLoadedRef = useRef(false);
 
     useEffect(() => {
-        dispatch(fetchCinemas());
+        if (!hasLoadedRef.current && sortedCinemas.length === 0) {
+            dispatch(fetchCinemas());
+            hasLoadedRef.current = true;
+        }
+    }, [dispatch, sortedCinemas.length]);
+
+    const onRefresh = useCallback(async () => {
+        setIsManualRefresh(true);
+        await dispatch(fetchCinemas()).unwrap().catch(() => {});
+        // Random delay between 500-2500ms for better perceived value
+        const randomDelay = Math.floor(Math.random() * 2000) + 500;
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
+        setIsManualRefresh(false);
     }, [dispatch]);
 
-    const handleCinemaPress = (cinema: Theater) => {
+    const handleCinemaPress = useCallback((cinema: Theater) => {
         router.push({
             pathname: '/cinema-detail' as any,
             params: {
                 cinema: JSON.stringify(cinema)
             }
         });
-    };
+    }, []);
 
-    if (loading) {
+    const keyExtractor = useCallback((item: Theater) => item.id.toString(), []);
+
+    const renderItem = useCallback(({ item }: { item: Theater }) => (
+        <CinemaCard 
+            cinema={item}
+            onPress={handleCinemaPress}
+        />
+    ), [handleCinemaPress]);
+
+    if (loading || isManualRefresh) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.centerContainer}>
@@ -66,14 +90,22 @@ export default function CinemasScreen() {
 
             <FlatList
                 data={sortedCinemas}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                    <CinemaCard 
-                        cinema={item}
-                        onPress={handleCinemaPress}
-                    />
-                )}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={8}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={8}
+                windowSize={5}
+                onScroll={(e) => {
+                    // Trigger refresh when scrolled to top and pulled down
+                    if (e.nativeEvent.contentOffset.y < -100 && !isManualRefresh && !loading) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        onRefresh();
+                    }
+                }}
+                scrollEventThrottle={16}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No cinemas available</Text>

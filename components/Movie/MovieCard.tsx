@@ -5,15 +5,17 @@ import { Movie } from '../../Services';
 interface MovieCardProps {
     movie: Movie;
     onPress: (movie: Movie) => void;
+    disableTouch?: boolean;
 }
 
-export const MovieCard: React.FC<MovieCardProps> = ({ movie, onPress }) => {
-    return (
-        <TouchableOpacity style={styles.container} onPress={() => onPress(movie)}>
+export const MovieCard: React.FC<MovieCardProps> = React.memo(({ movie, onPress, disableTouch = false }) => {
+    const CardContent = (
+        <>
             <Image
                 source={{ uri: movie.poster }}
                 style={styles.poster}
                 resizeMode="cover"
+                fadeDuration={100}
             />
             <View style={styles.info}>
                 <Text style={styles.title} numberOfLines={2}>{movie.title}</Text>
@@ -26,9 +28,22 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie, onPress }) => {
                     ))}
                 </View>
             </View>
+        </>
+    );
+
+    if (disableTouch) {
+        return <View style={styles.container}>{CardContent}</View>;
+    }
+
+    return (
+        <TouchableOpacity style={styles.container} onPress={() => onPress(movie)} activeOpacity={0.7}>
+            {CardContent}
         </TouchableOpacity>
     );
-};
+}, (prevProps: MovieCardProps, nextProps: MovieCardProps) => {
+    // Only re-render if movie ID or onPress reference changes
+    return prevProps.movie._id === nextProps.movie._id && prevProps.onPress === nextProps.onPress;
+});
 
 const styles = StyleSheet.create({
     container: {
