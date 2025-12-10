@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -8,39 +8,26 @@ import {
     SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Movie, getUpcomingMovies } from '../Services';
+import { Movie } from '../Services';
 import { MovieCard } from '../components/Movie';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchUpcomingMovies } from '../store/upcomingMoviesSlice';
 
 export default function UpcomingMoviesScreen() {
-    const [movies, setMovies] = useState<Movie[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const dispatch = useAppDispatch();
+    const { upcomingMovies, loading, error } = useAppSelector((state) => state.upcomingMovies);
+    
+    const sortedMovies = useMemo(() => {
+        return [...upcomingMovies].sort((a, b) => {
+            const dateA = a.omdb?.[0]?.Released ? new Date(a.omdb[0].Released).getTime() : 0;
+            const dateB = b.omdb?.[0]?.Released ? new Date(b.omdb[0].Released).getTime() : 0;
+            return dateA - dateB;
+        });
+    }, [upcomingMovies]);
 
     useEffect(() => {
-        loadUpcomingMovies();
-    }, []);
-
-    const loadUpcomingMovies = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getUpcomingMovies();
-            
-            // Sort by release date (if available in omdb data)
-            const sorted = data.sort((a, b) => {
-                const dateA = a.omdb?.[0]?.Released ? new Date(a.omdb[0].Released).getTime() : 0;
-                const dateB = b.omdb?.[0]?.Released ? new Date(b.omdb[0].Released).getTime() : 0;
-                return dateA - dateB;
-            });
-            
-            setMovies(sorted);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load upcoming movies');
-            console.error('Error loading upcoming movies:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        dispatch(fetchUpcomingMovies());
+    }, [dispatch]);
 
     const handleMoviePress = (movie: Movie) => {
         router.push({
@@ -94,12 +81,12 @@ export default function UpcomingMoviesScreen() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Upcoming Movies</Text>
                 <Text style={styles.subtitle}>
-                    {movies.length} {movies.length === 1 ? 'movie' : 'movies'} coming soon
+                    {sortedMovies.length} {sortedMovies.length === 1 ? 'movie' : 'movies'} coming soon
                 </Text>
             </View>
 
             <FlatList
-                data={movies}
+                data={sortedMovies}
                 keyExtractor={(item) => item._id}
                 renderItem={renderMovieItem}
                 contentContainerStyle={styles.listContent}

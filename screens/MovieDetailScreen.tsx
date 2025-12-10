@@ -10,48 +10,31 @@ import {
     Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Movie, addFavorite, removeFavorite, isFavorite } from '../Services';
+import { Movie } from '../Services';
 import { formatDuration } from '../Services/formatters';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { addFavorite, removeFavorite } from '../store/favoritesSlice';
 
 const { width } = Dimensions.get('window');
 
 export default function MovieDetailScreen() {
     const params = useLocalSearchParams();
     const router = useRouter();
+    const dispatch = useAppDispatch();
+    const favorites = useAppSelector((state) => state.favorites.favorites);
     
     // Parse the movie object from params
     const movie: Movie = params.movie ? JSON.parse(params.movie as string) : null;
     
-    const [isFav, setIsFav] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const isFav = movie ? favorites.some(f => f._id === movie._id) : false;
 
-    useEffect(() => {
-        if (movie) {
-            checkFavorite();
-        }
-    }, [movie]);
-
-    const checkFavorite = async () => {
-        if (movie) {
-            const favStatus = await isFavorite(movie._id);
-            setIsFav(favStatus);
-            setLoading(false);
-        }
-    };
-
-    const toggleFavorite = async () => {
+    const toggleFavorite = () => {
         if (!movie) return;
         
-        try {
-            if (isFav) {
-                await removeFavorite(movie._id);
-                setIsFav(false);
-            } else {
-                await addFavorite(movie);
-                setIsFav(true);
-            }
-        } catch (error) {
-            console.error('Error toggling favorite:', error);
+        if (isFav) {
+            dispatch(removeFavorite(movie._id));
+        } else {
+            dispatch(addFavorite(movie));
         }
     };
 
@@ -104,7 +87,6 @@ export default function MovieDetailScreen() {
                 <TouchableOpacity
                     style={styles.favoriteButton}
                     onPress={toggleFavorite}
-                    disabled={loading}
                 >
                     <Text style={styles.favoriteIcon}>
                         {isFav ? '❤️' : '🤍'}
