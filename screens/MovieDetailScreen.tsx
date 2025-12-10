@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    Image,
-    Dimensions,
-    TouchableOpacity,
-    Linking,
-} from 'react-native';
+import Review from '@/components/Movie/review';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import {
+    Dimensions,
+    Image,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { Movie } from '../Services';
 import { formatDuration } from '../Services/formatters';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addFavorite, removeFavorite } from '../store/favoritesSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 const { width } = Dimensions.get('window');
 
@@ -189,6 +190,12 @@ export default function MovieDetailScreen() {
                         ))}
                     </View>
                 )}
+
+                {/* Your review */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Your review</Text>
+                    <Review movieId={movie._id} />
+                </View>
 
                 {/* Showtimes */}
                 {movie.showtimes && movie.showtimes.length > 0 && (
