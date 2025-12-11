@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import Review from '@/components/Movie/review';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    Image,
     Dimensions,
+    Image,
+    Linking as RNLinking,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
     TouchableOpacity,
-    Linking,
+    View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -15,8 +19,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import SwipeableTabWrapper from '../components/SwipeableTabWrapper';
 import { Movie } from '../Services';
 import { formatDuration } from '../Services/formatters';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addFavorite, removeFavorite } from '../store/favoritesSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +29,24 @@ export default function MovieDetailScreen() {
     const router = useRouter();
     const dispatch = useAppDispatch();
     const favorites = useAppSelector((state) => state.favorites.favorites);
+
+    // sharing movies here
+    const handleShareMovie = async () => {
+        if (!movie) return;
+
+        //Deep link created for the movie
+        const url = Linking.createURL('/movie-detail', {
+            queryParams: { movieId: movie._id},
+        });
+        
+        try {
+            await Share.share({
+                message: `${movie.title} (${movie.year}) \n\n${url}`,
+            });
+        } catch (error) {
+            console.log('Error sharing the movie', error);
+        }
+    };
     
     // Parse the movie object from params
     const movie: Movie = params.movie ? JSON.parse(params.movie as string) : null;
@@ -70,14 +92,14 @@ export default function MovieDetailScreen() {
         }
         
         if (url && typeof url === 'string') {
-            Linking.openURL(url);
+            RNLinking.openURL(url);
         } else {
             console.log('No valid trailer URL found:', trailer);
         }
     };
 
     const handleTicketPress = (url: string) => {
-        Linking.openURL(url);
+        RNLinking.openURL(url);
     };
 
     return (
@@ -110,6 +132,9 @@ export default function MovieDetailScreen() {
 
             {/* Info Section */}
             <View style={styles.infoSection}>
+                <TouchableOpacity style={styles.shareButton} onPress={handleShareMovie}>
+                    <Text style={styles.shareButtonText}>Share this movie</Text>
+                </TouchableOpacity>
                 {/* Genres */}
                 <View style={styles.genresContainer}>
                     {movie.genres.map((genre, index) => (
@@ -199,6 +224,12 @@ export default function MovieDetailScreen() {
                         ))}
                     </View>
                 )}
+
+                {/* Your review */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Your review</Text>
+                    <Review movieId={movie._id} />
+                </View>
 
                 {/* Showtimes */}
                 {movie.showtimes && movie.showtimes.length > 0 && (
@@ -443,5 +474,17 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 10,
         marginTop: 2,
+    },
+    shareButton: {
+        backgroundColor: '#007AFF',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    shareButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

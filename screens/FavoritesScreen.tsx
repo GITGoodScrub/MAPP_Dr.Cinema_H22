@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
     ActivityIndicator,
-    SafeAreaView,
     Alert,
+    SafeAreaView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import DraggableFlatList, { OpacityDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
     Animated,
     RefreshControl,
     ScrollView,
@@ -19,8 +25,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-swipeable-item';
 import { Movie } from '../Services';
 import { MovieCard } from '../components/Movie';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loadFavoritesFromStorage, removeFavorite, reorderFavorites } from '../store/favoritesSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 export default function FavoritesScreen() {
     const dispatch = useAppDispatch();
@@ -179,6 +185,30 @@ export default function FavoritesScreen() {
         }
     }, [hasChanges, originalFavorites]);
 
+    // Sharing favorite movie list with deeplinking
+    const handleShareFavorites = async () => {
+        if (!favorites.length) {
+            Alert.alert ('You have no favourite movies to share, press the heart icon to add them.');
+            return;
+        }
+
+        try {
+            const lines = favorites.map((movie) => {
+                const url = Linking.createURL('/movie-detail', {
+                    queryParams: {movieId: movie._id},
+                });
+                return `${movie.title} (${movie.year}) - ${url}`;
+            });
+
+            const message = `Here are my favourite movies: \n\n${lines.join('\n')}`;
+
+            await Share.share({ message });
+        } catch (error) {
+            console.log('Error sharing favourite movies', error)
+        }
+    }
+
+    const renderUnderlayLeft = () => (
     const renderUnderlayLeft = useCallback(() => (
         <View style={styles.underlayContainer}>
             <Ionicons name="trash-outline" size={36} color="white" />
@@ -361,6 +391,18 @@ export default function FavoritesScreen() {
                                 </TouchableOpacity>
                             </View>
                         )}
+
+                        {/* Share fav button */}
+                        {favorites.length > 0 && !editMode && (
+                            <TouchableOpacity
+                                style={styles.shareFab}
+                                onPress={handleShareFavorites}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.shareFabText}>Share list</Text>
+                            </TouchableOpacity>
+                        )}
+
                     </>
                 )}
             </SafeAreaView>
@@ -509,5 +551,26 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         lineHeight: 24,
+    },
+
+    shareFab: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#007AFF',
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+
+    shareFabText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
     },
 });
