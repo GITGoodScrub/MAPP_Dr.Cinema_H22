@@ -16,6 +16,11 @@ export const store = configureStore({
             serializableCheck: {
                 // Ignore these action types
                 ignoredActions: ['favorites/addFavorite', 'favorites/removeFavorite', 'favorites/reorderFavorites'],
+                // Reduce checks for better performance
+                warnAfter: 128,
+            },
+            immutableCheck: {
+                warnAfter: 128,
             },
         }),
 });

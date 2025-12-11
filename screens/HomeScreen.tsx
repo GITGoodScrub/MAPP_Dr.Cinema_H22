@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SectionList, ActivityIndicator, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, SectionList, ActivityIndicator, SafeAreaView, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Movie, groupMoviesByCinema, filterMovies, MovieFilters } from '../Services';
 import { MovieCard } from '../components/Movie';
 import { FilterModal } from '../components/FilterModal';
@@ -11,67 +12,103 @@ export default function HomeScreen() {
     const dispatch = useAppDispatch();
     const { movies, loading, error } = useAppSelector((state) => state.movies);
     
-    const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
-    const [groupedMovies, setGroupedMovies] = useState<any[]>([]);
+    const [searchText, setSearchText] = useState('');
     const [filters, setFilters] = useState<MovieFilters>({});
     const [filterModalVisible, setFilterModalVisible] = useState(false);
-    const [activeFilterCount, setActiveFilterCount] = useState(0);
+    const [isManualRefresh, setIsManualRefresh] = useState(false);
+    const hasLoadedRef = useRef(false);
 
     useEffect(() => {
-        dispatch(fetchMovies());
+        if (!hasLoadedRef.current && movies.length === 0) {
+            dispatch(fetchMovies());
+            hasLoadedRef.current = true;
+        }
+    }, [dispatch, movies.length]);
+
+    const onRefresh = useCallback(async () => {
+        setIsManualRefresh(true);
+        await dispatch(fetchMovies()).unwrap().catch(() => {});
+        // Random delay between 500-2500ms for better perceived value
+        const randomDelay = Math.floor(Math.random() * 2000) + 500;
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
+        setIsManualRefresh(false);
     }, [dispatch]);
 
-    useEffect(() => {
-        if (movies.length > 0) {
-            setFilteredMovies(movies);
-            
-            // Group movies by cinema
-            const grouped = groupMoviesByCinema(movies);
-            
-            // Convert to SectionList format
-            const sections = grouped.map(group => ({
-                title: group.cinemaName,
-                cinemaId: group.cinemaId,
-                data: group.movies
-            }));
-            
-            setGroupedMovies(sections);
+    // Memoize filtered movies to avoid recalculation on every render
+    const filteredMovies = useMemo(() => {
+        const combinedFilters = { ...filters, searchText };
+        if (Object.keys(combinedFilters).filter(key => combinedFilters[key as keyof MovieFilters]).length === 0) {
+            return movies;
         }
-    }, [movies]);
+        return filterMovies(movies, combinedFilters);
+    }, [movies, filters, searchText]);
 
-    const applyFilters = (newFilters: MovieFilters) => {
-        setFilters(newFilters);
-        setFilterModalVisible(false);
+    // Memoize grouped movies for SectionList
+    const groupedMovies = useMemo(() => {
+        if (filteredMovies.length === 0) return [];
         
-        // Count active filters
-        const count = Object.values(newFilters).filter(v => v !== undefined && v !== '').length;
-        setActiveFilterCount(count);
-        
-        // Apply filters
-        const filtered = filterMovies(movies, newFilters);
-        setFilteredMovies(filtered);
-        
-        // Re-group filtered movies
-        const grouped = groupMoviesByCinema(filtered);
-        const sections = grouped.map(group => ({
+        const grouped = groupMoviesByCinema(filteredMovies);
+        return grouped.map(group => ({
             title: group.cinemaName,
             cinemaId: group.cinemaId,
             data: group.movies
         }));
-        
-        setGroupedMovies(sections);
-    };
+    }, [filteredMovies]);
 
-    const handleMoviePress = (movie: Movie) => {
+    // Memoize active filter count (excluding search text)
+    const activeFilterCount = useMemo(() => {
+        try {
+            const count = Object.entries(filters).filter(([key, value]) => {
+                if (key === 'searchText') return false;
+                if (value === undefined || value === null || value === '') return false;
+                // For numeric values, check if > 0
+                if (typeof value === 'number') return value > 0;
+                return true;
+            }).length;
+            return Number(count) || 0;
+        } catch (e) {
+            return 0;
+        }
+    }, [filters]);
+
+    const applyFilters = useCallback((newFilters: MovieFilters) => {
+        setFilters(newFilters);
+        setFilterModalVisible(false);
+    }, []);
+
+    const handleMoviePress = useCallback((movie: Movie) => {
         router.push({
             pathname: '/movie-detail' as any,
             params: {
                 movie: JSON.stringify(movie)
             }
         });
-    };
+    }, []);
 
-    if (loading) {
+    // Memoize keyExtractor
+    const keyExtractor = useCallback((item: Movie, index: number) => {
+        return `${item._id}-${index}`;
+    }, []);
+
+    // Memoize renderItem
+    const renderItem = useCallback(({ item }: { item: Movie }) => (
+        <MovieCard 
+            movie={item} 
+            onPress={handleMoviePress}
+        />
+    ), [handleMoviePress]);
+
+    // Memoize renderSectionHeader
+    const renderSectionHeader = useCallback(({ section }: any) => (
+        <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.movieCount}>
+                {section.data.length} {section.data.length === 1 ? 'movie' : 'movies'}
+            </Text>
+        </View>
+    ), []);
+
+    if (loading || isManualRefresh) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.centerContainer}>
@@ -109,25 +146,37 @@ export default function HomeScreen() {
                 </TouchableOpacity>
             </View>
             
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    placeholder="Search movies, actors, directors..."
+                    placeholderTextColor="#999"
+                    clearButtonMode="while-editing"
+                />
+            </View>
+            
             <SectionList
                 sections={groupedMovies}
-                keyExtractor={(item, index) => `${item._id}-${groupedMovies.findIndex(section => section.data.includes(item))}-${index}`}
-                renderItem={({ item }) => (
-                    <MovieCard 
-                        movie={item} 
-                        onPress={handleMoviePress}
-                    />
-                )}
-                renderSectionHeader={({ section }) => (
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>{section.title}</Text>
-                        <Text style={styles.movieCount}>
-                            {section.data.length} {section.data.length === 1 ? 'movie' : 'movies'}
-                        </Text>
-                    </View>
-                )}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                renderSectionHeader={renderSectionHeader}
                 contentContainerStyle={styles.listContent}
                 stickySectionHeadersEnabled={true}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={10}
+                windowSize={5}
+                onScroll={(e) => {
+                    // Trigger refresh when scrolled to top and pulled down
+                    if (e.nativeEvent.contentOffset.y < -100 && !isManualRefresh && !loading) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        onRefresh();
+                    }
+                }}
+                scrollEventThrottle={16}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No movies available</Text>
@@ -157,7 +206,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     header: {
-        backgroundColor: '#fff',
+        backgroundColor: '#383d40',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
@@ -169,7 +218,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#f1f1f1ff',
     },
     filterButton: {
         flexDirection: 'row',
@@ -202,6 +251,21 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 11,
         fontWeight: 'bold',
+    },
+    searchContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    searchInput: {
+        backgroundColor: '#f0f0f0',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: '#333',
     },
     loadingText: {
         marginTop: 12,
