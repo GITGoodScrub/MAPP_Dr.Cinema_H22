@@ -20,6 +20,7 @@ export default function TabsLayout() {
                     fontSize: 12,
                     fontWeight: '600',
                 },
+                animation: 'shift',
             }}
         >
             <Tabs.Screen

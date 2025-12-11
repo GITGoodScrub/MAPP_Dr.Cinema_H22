@@ -10,6 +10,9 @@ import {
     Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import SwipeableTabWrapper from '../components/SwipeableTabWrapper';
 import { Movie } from '../Services';
 import { formatDuration } from '../Services/formatters';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -32,8 +35,10 @@ export default function MovieDetailScreen() {
         if (!movie) return;
         
         if (isFav) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch(removeFavorite(movie._id));
         } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch(addFavorite(movie));
         }
     };
@@ -76,7 +81,12 @@ export default function MovieDetailScreen() {
     };
 
     return (
-        <ScrollView style={styles.container}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SwipeableTabWrapper
+                canSwipeRight={true}
+                rightRoute="back"
+            >
+                <ScrollView style={styles.container}>
             {/* Poster Section */}
             <View style={styles.posterContainer}>
                 <Image
@@ -217,6 +227,8 @@ export default function MovieDetailScreen() {
                 )}
             </View>
         </ScrollView>
+            </SwipeableTabWrapper>
+        </GestureHandlerRootView>
     );
 }
 

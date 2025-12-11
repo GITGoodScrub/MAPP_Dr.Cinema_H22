@@ -9,6 +9,8 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import SwipeableTabWrapper from '../components/SwipeableTabWrapper';
 import { Theater, Movie, getMovies } from '../Services';
 import { MovieCard } from '../components/Movie';
 
@@ -93,7 +95,12 @@ export default function CinemaDetailScreen() {
     }
 
     return (
-        <ScrollView style={styles.container}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SwipeableTabWrapper
+                canSwipeRight={true}
+                rightRoute="back"
+            >
+                <ScrollView style={styles.container}>
             {/* Cinema Info Section */}
             <View style={styles.infoSection}>
                 <Text style={styles.name}>{cinema.name}</Text>
@@ -166,7 +173,9 @@ export default function CinemaDetailScreen() {
                     <Text style={styles.noMoviesText}>No movies currently showing</Text>
                 )}
             </View>
-        </ScrollView>
+            </ScrollView>
+            </SwipeableTabWrapper>
+        </GestureHandlerRootView>
     );
 }
 
