@@ -40,6 +40,10 @@ export const groupMoviesByCinema = (movies: Movie[]) => {
  * Formats duration in minutes to hours and minutes
  */
 export const formatDuration = (minutes: number): string => {
+    if (!minutes || isNaN(minutes)) {
+        return '--';
+    }
+    
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     

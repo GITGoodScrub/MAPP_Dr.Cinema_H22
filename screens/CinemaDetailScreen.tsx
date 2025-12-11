@@ -8,6 +8,7 @@ import {
     Linking,
     ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import SwipeableTabWrapper from '../components/SwipeableTabWrapper';
@@ -67,7 +68,27 @@ export default function CinemaDetailScreen() {
 
     const handleMapPress = () => {
         if (cinema.google_map) {
-            Linking.openURL(cinema.google_map);
+            let mapUrl = cinema.google_map;
+            
+            // Check if it's an iframe embed code
+            if (mapUrl.includes('<iframe')) {
+                // Extract the src URL from the iframe
+                const srcMatch = mapUrl.match(/src="([^"]+)"/);
+                if (srcMatch && srcMatch[1]) {
+                    mapUrl = srcMatch[1];
+                    // Decode HTML entities
+                    mapUrl = mapUrl.replace(/&amp;/g, '&');
+                }
+            }
+            
+            // If it's still not a valid URL or is a relative path, create a Google Maps search URL
+            if (!mapUrl.startsWith('http://') && !mapUrl.startsWith('https://')) {
+                // Use cinema address or name for search
+                const searchQuery = encodeURIComponent(cinema.address || cinema.name);
+                mapUrl = `https://www.google.com/maps/search/?api=1&query=${searchQuery}`;
+            }
+            
+            Linking.openURL(mapUrl);
         }
     };
 
@@ -114,7 +135,10 @@ export default function CinemaDetailScreen() {
                 <View style={styles.contactSection}>
                     {cinema.address && (
                         <View style={styles.contactItem}>
-                            <Text style={styles.contactLabel}>📍 Address</Text>
+                            <View style={styles.contactLabelContainer}>
+                                <Ionicons name="location-outline" size={18} color="#007AFF" />
+                                <Text style={styles.contactLabel}>Address</Text>
+                            </View>
                             <Text style={styles.contactText}>{cinema.address}</Text>
                         </View>
                     )}
@@ -144,7 +168,8 @@ export default function CinemaDetailScreen() {
                             style={styles.mapButton}
                             onPress={handleMapPress}
                         >
-                            <Text style={styles.mapButtonText}>📍 Open in Maps</Text>
+                            <Ionicons name="location-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.mapButtonText}>Open in Maps</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -237,10 +262,15 @@ const styles = StyleSheet.create({
     contactItem: {
         marginBottom: 8,
     },
+    contactLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 4,
+    },
     contactLabel: {
         fontSize: 12,
         color: '#999',
-        marginBottom: 4,
     },
     contactText: {
         fontSize: 15,
@@ -254,7 +284,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#007AFF',
         padding: 14,
         borderRadius: 8,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         marginTop: 8,
     },
     mapButtonText: {

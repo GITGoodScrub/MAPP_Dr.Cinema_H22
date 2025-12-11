@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabsLayout() {
     return (
@@ -27,28 +27,28 @@ export default function TabsLayout() {
                 name="index"
                 options={{
                     title: 'Movies',
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎬</Text>,
+                    tabBarIcon: ({ color }) => <Ionicons name="videocam-outline" size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="cinemas"
                 options={{
                     title: 'Cinemas',
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎭</Text>,
+                    tabBarIcon: ({ color }) => <Ionicons name="film-outline" size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="upcoming"
                 options={{
                     title: 'Upcoming',
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📅</Text>,
+                    tabBarIcon: ({ color }) => <Ionicons name="calendar-outline" size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="favorites"
                 options={{
                     title: 'Favorites',
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>❤️</Text>,
+                    tabBarIcon: ({ color }) => <Ionicons name="heart-outline" size={24} color={color} />,
                 }}
             />
         </Tabs>

@@ -188,6 +188,8 @@ export default function FavoritesScreen() {
             return;
         }
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         try {
             const lines = favorites.map((movie) => {
                 const url = Linking.createURL('/movie-detail', {
@@ -206,7 +208,7 @@ export default function FavoritesScreen() {
 
     const renderUnderlayLeft = useCallback(() => (
         <View style={styles.underlayContainer}>
-            <Ionicons name="trash-outline" size={36} color="white" />
+            <Ionicons name="trash-outline" size={28} color="white" />
         </View>
     ), []);
 
@@ -394,7 +396,7 @@ export default function FavoritesScreen() {
                                 onPress={handleShareFavorites}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.shareFabText}>Share list</Text>
+                                <Ionicons name="share-outline" size={24} color="#fff" />
                             </TouchableOpacity>
                         )}
 
@@ -552,20 +554,16 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 20,
         right: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: '#007AFF',
+        justifyContent: 'center',
+        alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-
-    shareFabText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 13,
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
 });
