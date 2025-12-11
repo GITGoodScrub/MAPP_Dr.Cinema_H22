@@ -35,6 +35,7 @@ export default function FavoritesScreen() {
     const hasLoadedRef = useRef(false);
     const scrollOffsetRef = useRef(0);
     const isRefreshingRef = useRef(false);
+    const fadeAnims = useRef(new Map<string, Animated.Value>()).current;
 
     // Load favorites only once on mount
     useEffect(() => {
@@ -70,8 +71,14 @@ export default function FavoritesScreen() {
         if (!isManualRefresh) {
             setLocalFavorites(favorites);
             setOriginalFavorites(favorites);
+            // Initialize animations for new items
+            favorites.forEach(movie => {
+                if (!fadeAnims.has(movie._id)) {
+                    fadeAnims.set(movie._id, new Animated.Value(1));
+                }
+            });
         }
-    }, [favorites, isManualRefresh]);
+    }, [favorites, isManualRefresh, fadeAnims]);
 
     const handleMoviePress = useCallback((movie: Movie) => {
         if (editMode) return; // Disable navigation in edit mode
@@ -104,10 +111,26 @@ export default function FavoritesScreen() {
                     text: 'Remove',
                     style: 'destructive',
                     onPress: () => {
-                        dispatch(removeFavorite(movieId));
-                        const updated = localFavorites.filter(m => m._id !== movieId);
-                        setLocalFavorites(updated);
-                        setOriginalFavorites(updated);
+                        // Animate out before removing
+                        const fadeAnim = fadeAnims.get(movieId);
+                        if (fadeAnim) {
+                            Animated.timing(fadeAnim, {
+                                toValue: 0,
+                                duration: 250,
+                                useNativeDriver: true,
+                            }).start(() => {
+                                dispatch(removeFavorite(movieId));
+                                const updated = localFavorites.filter(m => m._id !== movieId);
+                                setLocalFavorites(updated);
+                                setOriginalFavorites(updated);
+                                fadeAnims.delete(movieId);
+                            });
+                        } else {
+                            dispatch(removeFavorite(movieId));
+                            const updated = localFavorites.filter(m => m._id !== movieId);
+                            setLocalFavorites(updated);
+                            setOriginalFavorites(updated);
+                        }
                     },
                 },
             ]
@@ -197,7 +220,20 @@ export default function FavoritesScreen() {
                         }
                     }}
                 >
-                <View style={styles.movieContainer}>
+                <Animated.View style={[
+                    styles.movieContainer,
+                    {
+                        opacity: fadeAnims.get(item._id) || 1,
+                        transform: [
+                            {
+                                scale: fadeAnims.get(item._id)?.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.8, 1],
+                                }) || 1,
+                            },
+                        ],
+                    },
+                ]}>
                     <TouchableOpacity
                         style={styles.movieCardWrapper}
                         onPress={() => !editMode && handleMoviePress(item)}
@@ -227,7 +263,7 @@ export default function FavoritesScreen() {
                             <Text style={styles.dragHandleText}>☰</Text>
                         </View>
                     )}
-                </View>
+                </Animated.View>
             </Swipeable>
         </OpacityDecorator>
         );
@@ -394,6 +430,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         paddingRight: 30,
         marginBottom: 12,
+        borderRadius: 12,
     },
     dragHandle: {
         justifyContent: 'center',
