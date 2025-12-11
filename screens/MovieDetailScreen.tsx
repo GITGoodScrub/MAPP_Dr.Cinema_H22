@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Dimensions,
     Image,
     Linking as RNLinking,
+    Modal,
     ScrollView,
     Share,
     StyleSheet,
@@ -10,6 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import * as WebBrowser from 'expo-web-browser';
 import Review from '@/components/Movie/review';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,16 +27,65 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 const { width } = Dimensions.get('window');
 
+// Function to get country flag emoji from country name
+const getCountryFlag = (country: string): string => {
+    const countryFlags: { [key: string]: string } = {
+        'USA': '🇺🇸', 'United States': '🇺🇸', 'US': '🇺🇸',
+        'UK': '🇬🇧', 'United Kingdom': '🇬🇧', 'England': '🇬🇧',
+        'Canada': '🇨🇦', 'France': '🇫🇷', 'Germany': '🇩🇪',
+        'Italy': '🇮🇹', 'Spain': '🇪🇸', 'Japan': '🇯🇵',
+        'China': '🇨🇳', 'South Korea': '🇰🇷', 'Korea': '🇰🇷',
+        'Australia': '🇦🇺', 'Brazil': '🇧🇷', 'Mexico': '🇲🇽',
+        'India': '🇮🇳', 'Russia': '🇷🇺', 'Sweden': '🇸🇪',
+        'Norway': '🇳🇴', 'Denmark': '🇩🇰', 'Finland': '🇫🇮',
+        'Iceland': '🇮🇸', 'Ireland': '🇮🇪', 'Netherlands': '🇳🇱',
+        'Belgium': '🇧🇪', 'Switzerland': '🇨🇭', 'Austria': '🇦🇹',
+        'Poland': '🇵🇱', 'Czech Republic': '🇨🇿', 'Hungary': '🇭🇺',
+        'Portugal': '🇵🇹', 'Greece': '🇬🇷', 'Turkey': '🇹🇷',
+        'Argentina': '🇦🇷', 'Chile': '🇨🇱', 'Colombia': '🇨🇴',
+        'New Zealand': '🇳🇿', 'South Africa': '🇿🇦', 'Israel': '🇮🇱',
+        'Thailand': '🇹🇭', 'Hong Kong': '🇭🇰', 'Taiwan': '🇹🇼',
+        'Singapore': '🇸🇬', 'Malaysia': '🇲🇾', 'Indonesia': '🇮🇩',
+        'Philippines': '🇵🇭', 'Vietnam': '🇻🇳', 'Egypt': '🇪🇬',
+    };
+    
+    // Check for exact match first
+    if (countryFlags[country]) {
+        return countryFlags[country];
+    }
+    
+    // Check if country string contains multiple countries (e.g., "USA, UK")
+    const countries = country.split(',').map(c => c.trim());
+    const flags = countries.map(c => countryFlags[c]).filter(Boolean);
+    if (flags.length > 0) {
+        return flags.join(' ');
+    }
+    
+    // Default to globe emoji if country not found
+    return '🌍';
+};
+
 export default function MovieDetailScreen() {
     const params = useLocalSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
     const favorites = useAppSelector((state) => state.favorites.favorites);
 
+    const [videoModalVisible, setVideoModalVisible] = useState(false);
+    const [currentTrailerUrl, setCurrentTrailerUrl] = useState<string | null>(null);
+    
+    const player = useVideoPlayer(currentTrailerUrl || '', (player) => {
+        if (currentTrailerUrl) {
+            player.play();
+        }
+    });
+
     // sharing movies here
     const handleShareMovie = async () => {
         if (!movie) return;
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        
         //Deep link created for the movie
         const url = Linking.createURL('/movie-detail', {
             queryParams: { movieId: movie._id},
@@ -78,7 +131,7 @@ export default function MovieDetailScreen() {
         );
     }
 
-    const handleTrailerPress = (trailer: any) => {
+    const handleTrailerPress = async (trailer: any) => {
         // Extract URL from trailer object structure
         let url = null;
         
@@ -91,10 +144,22 @@ export default function MovieDetailScreen() {
         }
         
         if (url && typeof url === 'string') {
-            RNLinking.openURL(url);
+            // YouTube videos should open in browser
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                await WebBrowser.openBrowserAsync(url);
+            } else {
+                // For direct video URLs, use the video player
+                setCurrentTrailerUrl(url);
+                setVideoModalVisible(true);
+            }
         } else {
             console.log('No valid trailer URL found:', trailer);
         }
+    };
+
+    const closeVideoModal = () => {
+        setVideoModalVisible(false);
+        setCurrentTrailerUrl(null);
     };
 
     const handleTicketPress = (url: string) => {
@@ -119,9 +184,21 @@ export default function MovieDetailScreen() {
                     style={styles.favoriteButton}
                     onPress={toggleFavorite}
                 >
-                    <Text style={styles.favoriteIcon}>
-                        {isFav ? '❤️' : '🤍'}
-                    </Text>
+                    <Ionicons 
+                        name={isFav ? 'heart' : 'heart-outline'} 
+                        size={32} 
+                        color={isFav ? '#FF3B30' : '#000'} 
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.shareButtonCircular}
+                    onPress={handleShareMovie}
+                >
+                    <Ionicons 
+                        name="share-outline" 
+                        size={28} 
+                        color="#000" 
+                    />
                 </TouchableOpacity>
                 <View style={styles.posterOverlay}>
                     <Text style={styles.title}>{movie.title}</Text>
@@ -131,9 +208,6 @@ export default function MovieDetailScreen() {
 
             {/* Info Section */}
             <View style={styles.infoSection}>
-                <TouchableOpacity style={styles.shareButton} onPress={handleShareMovie}>
-                    <Text style={styles.shareButtonText}>Share this movie</Text>
-                </TouchableOpacity>
                 {/* Genres */}
                 <View style={styles.genresContainer}>
                     {movie.genres.map((genre, index) => (
@@ -160,21 +234,30 @@ export default function MovieDetailScreen() {
                     <View style={styles.ratingsContainer}>
                         <View style={styles.ratingCard}>
                             <Text style={styles.ratingLabel}>IMDB</Text>
-                            <Text style={styles.ratingValue}>
-                                {movie.ratings.imdb || 'N/A'}
-                            </Text>
+                            <View style={styles.ratingValueContainer}>
+                                <Ionicons name="star" size={20} color="#F5C518" />
+                                <Text style={styles.ratingValue}>
+                                    {movie.ratings.imdb && !isNaN(Number(movie.ratings.imdb)) ? movie.ratings.imdb : '--'}
+                                </Text>
+                            </View>
                         </View>
                         <View style={styles.ratingCard}>
                             <Text style={styles.ratingLabel}>Rotten Tomatoes</Text>
-                            <Text style={styles.ratingValue}>
-                                {movie.ratings.rotten_critics || 'N/A'}
-                            </Text>
+                            <View style={styles.ratingValueContainer}>
+                                <Text style={styles.tomatoIcon}>🍅</Text>
+                                <Text style={styles.ratingValue}>
+                                    {movie.ratings.rotten_critics && !isNaN(Number(movie.ratings.rotten_critics)) ? movie.ratings.rotten_critics : '--'}
+                                </Text>
+                            </View>
                         </View>
                         <View style={styles.ratingCard}>
                             <Text style={styles.ratingLabel}>Audience</Text>
-                            <Text style={styles.ratingValue}>
-                                {movie.ratings.rotten_audience || 'N/A'}
-                            </Text>
+                            <View style={styles.ratingValueContainer}>
+                                <Text style={styles.tomatoIcon}>🍿</Text>
+                                <Text style={styles.ratingValue}>
+                                    {movie.ratings.rotten_audience && !isNaN(Number(movie.ratings.rotten_audience)) ? movie.ratings.rotten_audience : '--'}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -255,9 +338,89 @@ export default function MovieDetailScreen() {
                         ))}
                     </View>
                 )}
+
+                {/* Details Section */}
+                <View style={styles.detailsSection}>
+                    <View style={styles.detailsHeader}>
+                        <View style={styles.detailsAccent} />
+                        <Text style={styles.detailsTitle}>Details</Text>
+                    </View>
+                    
+                    {movie.omdb && movie.omdb[0]?.Released && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Release date</Text>
+                            <Text style={styles.detailValue}>{movie.omdb[0].Released}</Text>
+                        </View>
+                    )}
+                    
+                    {movie.durationMinutes && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Runtime</Text>
+                            <Text style={styles.detailValue}>
+                                {formatDuration(movie.durationMinutes)} ({movie.durationMinutes}m)
+                            </Text>
+                        </View>
+                    )}
+                    
+                    {movie.omdb && movie.omdb[0]?.Country && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Countries of origin</Text>
+                            <Text style={styles.detailValue}>{movie.omdb[0].Country}</Text>
+                        </View>
+                    )}
+                    
+                    {movie.omdb && movie.omdb[0]?.Language && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Language</Text>
+                            <Text style={styles.detailValue}>{movie.omdb[0].Language}</Text>
+                        </View>
+                    )}
+                    
+                    {movie.alternativeTitles && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Also known as</Text>
+                            <Text style={styles.detailValue}>{movie.alternativeTitles}</Text>
+                        </View>
+                    )}
+                    
+                    {movie.omdb && movie.omdb[0]?.Production && (
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Production companies</Text>
+                            <Text style={styles.detailValue}>{movie.omdb[0].Production}</Text>
+                        </View>
+                    )}
+                </View>
             </View>
         </ScrollView>
             </SwipeableTabWrapper>
+
+            {/* Video Modal */}
+            <Modal
+                visible={videoModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={closeVideoModal}
+            >
+                <View style={styles.videoModalContainer}>
+                    <View style={styles.videoModalContent}>
+                        <TouchableOpacity 
+                            style={styles.closeButton}
+                            onPress={closeVideoModal}
+                        >
+                            <Ionicons name="close" size={30} color="#fff" />
+                        </TouchableOpacity>
+                        
+                        {currentTrailerUrl && (
+                            <VideoView
+                                style={styles.video}
+                                player={player}
+                                allowsFullscreen
+                                allowsPictureInPicture
+                            />
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </GestureHandlerRootView>
     );
 }
@@ -302,6 +465,23 @@ const styles = StyleSheet.create({
     favoriteButton: {
         position: 'absolute',
         top: 16,
+        right: 16,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+        zIndex: 10,
+    },
+    shareButtonCircular: {
+        position: 'absolute',
+        top: 84,
         right: 16,
         width: 56,
         height: 56,
@@ -372,11 +552,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 4,
+        marginRight: 12,
     },
     certificateText: {
         color: '#fff',
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    countryContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    flagEmoji: {
+        fontSize: 18,
+    },
+    countryText: {
+        fontSize: 14,
+        color: '#666',
     },
     ratingsContainer: {
         flexDirection: 'row',
@@ -399,10 +592,18 @@ const styles = StyleSheet.create({
         color: '#666',
         marginBottom: 4,
     },
+    ratingValueContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
     ratingValue: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
+    },
+    tomatoIcon: {
+        fontSize: 18,
     },
     section: {
         marginBottom: 24,
@@ -474,16 +675,74 @@ const styles = StyleSheet.create({
         fontSize: 10,
         marginTop: 2,
     },
-    shareButton: {
-        backgroundColor: '#007AFF',
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginBottom: 16,
+    detailsSection: {
+        backgroundColor: '#fff',
+        padding: 20,
+        marginTop: 8,
     },
-    shareButtonText: {
-        color: '#fff',
-        fontSize: 16,
+    detailsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    detailsAccent: {
+        width: 4,
+        height: 28,
+        backgroundColor: '#F5C518',
+        marginRight: 12,
+        borderRadius: 2,
+    },
+    detailsTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    detailRow: {
+        flexDirection: 'row',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    detailLabel: {
+        fontSize: 14,
         fontWeight: '600',
+        color: '#000',
+        width: 140,
+        flexShrink: 0,
+    },
+    detailValue: {
+        fontSize: 14,
+        color: '#007AFF',
+        flex: 1,
+        flexWrap: 'wrap',
+    },
+    videoModalContainer: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    videoModalContent: {
+        width: width - 40,
+        aspectRatio: 16 / 9,
+        backgroundColor: '#000',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    video: {
+        width: '100%',
+        height: '100%',
+    },
+    closeButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 10,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

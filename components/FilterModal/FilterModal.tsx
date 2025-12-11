@@ -65,6 +65,16 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
         setTimeRangeStart(0);
         setTimeRangeEnd(1435);
         setPgRating('');
+        
+        // Immediately apply the cleared filters
+        const clearedFilters: MovieFilters = {
+            minImdbRating: undefined,
+            minRottenRating: undefined,
+            showAfter: undefined,
+            showBefore: undefined,
+            pgRating: undefined,
+        };
+        onApply(clearedFilters);
     };
 
     return (

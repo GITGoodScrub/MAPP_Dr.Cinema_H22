@@ -137,7 +137,7 @@ export default function HomeScreen() {
                     style={styles.filterButton}
                     onPress={() => setFilterModalVisible(true)}
                 >
-                    <Text style={styles.filterButtonText}>🔍 Filters</Text>
+                    <Text style={styles.filterButtonText}>Filters</Text>
                     {activeFilterCount > 0 && (
                         <View style={styles.filterBadge}>
                             <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
