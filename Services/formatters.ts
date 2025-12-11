@@ -58,8 +58,6 @@ export interface MovieFilters {
     minRottenRating?: number;
     showAfter?: string; // Time in HH:MM format
     showBefore?: string; // Time in HH:MM format
-    actor?: string;
-    director?: string;
     pgRating?: string;
 }
 
@@ -68,10 +66,18 @@ export interface MovieFilters {
  */
 export const filterMovies = (movies: Movie[], filters: MovieFilters): Movie[] => {
     return movies.filter(movie => {
-        // Title search
+        // Title, Actor, and Director search
         if (filters.searchText) {
             const searchLower = filters.searchText.toLowerCase();
-            if (!movie.title.toLowerCase().includes(searchLower)) {
+            const titleMatch = movie.title.toLowerCase().includes(searchLower);
+            const actorMatch = movie.actors_abridged.some(a => 
+                a.name.toLowerCase().includes(searchLower)
+            );
+            const directorMatch = movie.directors_abridged.some(d => 
+                d.name.toLowerCase().includes(searchLower)
+            );
+            
+            if (!titleMatch && !actorMatch && !directorMatch) {
                 return false;
             }
         }
@@ -114,28 +120,6 @@ export const filterMovies = (movies: Movie[], filters: MovieFilters): Movie[] =>
             }
             
             if (!hasValidShowtime) {
-                return false;
-            }
-        }
-
-        // Actor search
-        if (filters.actor) {
-            const actorLower = filters.actor.toLowerCase();
-            const hasActor = movie.actors_abridged.some(a => 
-                a.name.toLowerCase().includes(actorLower)
-            );
-            if (!hasActor) {
-                return false;
-            }
-        }
-
-        // Director search
-        if (filters.director) {
-            const directorLower = filters.director.toLowerCase();
-            const hasDirector = movie.directors_abridged.some(d => 
-                d.name.toLowerCase().includes(directorLower)
-            );
-            if (!hasDirector) {
                 return false;
             }
         }

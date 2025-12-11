@@ -9,6 +9,9 @@ import {
     ScrollView,
     SafeAreaView,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import RangeSlider from '../RangeSlider';
+import Slider from '../Slider';
 import * as Haptics from 'expo-haptics';
 import { MovieFilters } from '../../Services/formatters';
 
@@ -19,27 +22,36 @@ interface FilterModalProps {
     initialFilters: MovieFilters;
 }
 
+// Helper function to convert HH:MM to minutes since midnight
+const timeToMinutes = (time: string): number => {
+    if (!time) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
+// Helper function to convert minutes since midnight to HH:MM
+const minutesToTime = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
 export default function FilterModal({ visible, onClose, onApply, initialFilters }: FilterModalProps) {
-    const [searchText, setSearchText] = useState(initialFilters.searchText || '');
-    const [minImdbRating, setMinImdbRating] = useState(initialFilters.minImdbRating?.toString() || '');
-    const [minRottenRating, setMinRottenRating] = useState(initialFilters.minRottenRating?.toString() || '');
-    const [showAfter, setShowAfter] = useState(initialFilters.showAfter || '');
-    const [showBefore, setShowBefore] = useState(initialFilters.showBefore || '');
-    const [actor, setActor] = useState(initialFilters.actor || '');
-    const [director, setDirector] = useState(initialFilters.director || '');
+    const [minImdbRating, setMinImdbRating] = useState(initialFilters.minImdbRating || 0);
+    const [minRottenRating, setMinRottenRating] = useState(initialFilters.minRottenRating || 0);
+    // Time range in minutes (0 = 00:00, 1435 = 23:55)
+    const [timeRangeStart, setTimeRangeStart] = useState(timeToMinutes(initialFilters.showAfter || '00:00'));
+    const [timeRangeEnd, setTimeRangeEnd] = useState(timeToMinutes(initialFilters.showBefore || '23:55'));
     const [pgRating, setPgRating] = useState(initialFilters.pgRating || '');
 
     const pgRatings = ['L', '7', '9', '12', '14', '16', '18'];
 
     const handleApply = () => {
         const filters: MovieFilters = {
-            searchText: searchText.trim() || undefined,
-            minImdbRating: minImdbRating ? parseFloat(minImdbRating) : undefined,
-            minRottenRating: minRottenRating ? parseFloat(minRottenRating) : undefined,
-            showAfter: showAfter.trim() || undefined,
-            showBefore: showBefore.trim() || undefined,
-            actor: actor.trim() || undefined,
-            director: director.trim() || undefined,
+            minImdbRating: minImdbRating > 0 ? minImdbRating : undefined,
+            minRottenRating: minRottenRating > 0 ? minRottenRating : undefined,
+            showAfter: timeRangeStart > 0 ? minutesToTime(timeRangeStart) : undefined,
+            showBefore: timeRangeEnd < 1435 ? minutesToTime(timeRangeEnd) : undefined,
             pgRating: pgRating || undefined,
         };
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -48,13 +60,10 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
 
     const handleClear = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setSearchText('');
-        setMinImdbRating('');
-        setMinRottenRating('');
-        setShowAfter('');
-        setShowBefore('');
-        setActor('');
-        setDirector('');
+        setMinImdbRating(0);
+        setMinRottenRating(0);
+        setTimeRangeStart(0);
+        setTimeRangeEnd(1435);
         setPgRating('');
     };
 
@@ -74,82 +83,62 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.scrollView}>
-                        {/* Title Search */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.label}>Movie Title</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Search by title..."
-                                value={searchText}
-                                onChangeText={setSearchText}
-                            />
-                        </View>
-
+                    <GestureHandlerRootView style={styles.gestureContainer}>
+                        <ScrollView style={styles.scrollView}>
                         {/* IMDB Rating */}
                         <View style={styles.filterSection}>
                             <Text style={styles.label}>Minimum IMDB Rating</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g., 7.0"
-                                keyboardType="decimal-pad"
+                            <View style={styles.ratingValueContainer}>
+                                <Text style={styles.ratingValue}>
+                                    {minImdbRating > 0 ? minImdbRating.toFixed(1) : 'Any'}
+                                </Text>
+                            </View>
+                            <Slider
+                                min={0}
+                                max={10}
+                                step={0.1}
                                 value={minImdbRating}
-                                onChangeText={setMinImdbRating}
+                                onValueChange={setMinImdbRating}
+                                useRatingColors={true}
                             />
                         </View>
 
                         {/* Rotten Tomatoes Rating */}
                         <View style={styles.filterSection}>
                             <Text style={styles.label}>Minimum Rotten Tomatoes Rating</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g., 70"
-                                keyboardType="decimal-pad"
+                            <View style={styles.ratingValueContainer}>
+                                <Text style={styles.ratingValue}>
+                                    {minRottenRating > 0 ? minRottenRating.toFixed(0) : 'Any'}
+                                </Text>
+                            </View>
+                            <Slider
+                                min={0}
+                                max={100}
+                                step={1}
                                 value={minRottenRating}
-                                onChangeText={setMinRottenRating}
+                                onValueChange={setMinRottenRating}
+                                useRatingColors={true}
                             />
                         </View>
 
                         {/* Showtime Range */}
                         <View style={styles.filterSection}>
-                            <Text style={styles.label}>Showtime After</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="HH:MM (e.g., 18:00)"
-                                value={showAfter}
-                                onChangeText={setShowAfter}
-                            />
-                        </View>
-
-                        <View style={styles.filterSection}>
-                            <Text style={styles.label}>Showtime Before</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="HH:MM (e.g., 22:00)"
-                                value={showBefore}
-                                onChangeText={setShowBefore}
-                            />
-                        </View>
-
-                        {/* Actor */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.label}>Actor Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Search by actor..."
-                                value={actor}
-                                onChangeText={setActor}
-                            />
-                        </View>
-
-                        {/* Director */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.label}>Director Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Search by director..."
-                                value={director}
-                                onChangeText={setDirector}
+                            <Text style={styles.label}>Showtime Range</Text>
+                            <View style={styles.timeRangeContainer}>
+                                <Text style={styles.timeLabel}>{minutesToTime(timeRangeStart)}</Text>
+                                <Text style={styles.timeLabel}>{minutesToTime(timeRangeEnd)}</Text>
+                            </View>
+                            
+                            <RangeSlider
+                                min={0}
+                                max={1435}
+                                step={5}
+                                minValue={timeRangeStart}
+                                maxValue={timeRangeEnd}
+                                onValuesChange={(min, max) => {
+                                    setTimeRangeStart(min);
+                                    setTimeRangeEnd(max);
+                                }}
                             />
                         </View>
 
@@ -186,7 +175,8 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                                 ))}
                             </View>
                         </View>
-                    </ScrollView>
+                        </ScrollView>
+                    </GestureHandlerRootView>
 
                     {/* Action Buttons */}
                     <View style={styles.actionButtons}>
@@ -237,6 +227,9 @@ const styles = StyleSheet.create({
     closeButton: {
         fontSize: 24,
         color: '#666',
+    },
+    gestureContainer: {
+        flexShrink: 1,
     },
     scrollView: {
         padding: 20,
@@ -311,5 +304,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    timeRangeContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+        paddingHorizontal: 8,
+    },
+    timeLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    ratingValueContainer: {
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    ratingValue: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#007AFF',
     },
 });

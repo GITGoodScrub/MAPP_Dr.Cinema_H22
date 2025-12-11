@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, SectionList, ActivityIndicator, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, SectionList, ActivityIndicator, SafeAreaView, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Movie, groupMoviesByCinema, filterMovies, MovieFilters } from '../Services';
@@ -12,6 +12,7 @@ export default function HomeScreen() {
     const dispatch = useAppDispatch();
     const { movies, loading, error } = useAppSelector((state) => state.movies);
     
+    const [searchText, setSearchText] = useState('');
     const [filters, setFilters] = useState<MovieFilters>({});
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [isManualRefresh, setIsManualRefresh] = useState(false);
@@ -35,11 +36,12 @@ export default function HomeScreen() {
 
     // Memoize filtered movies to avoid recalculation on every render
     const filteredMovies = useMemo(() => {
-        if (Object.keys(filters).length === 0) {
+        const combinedFilters = { ...filters, searchText };
+        if (Object.keys(combinedFilters).filter(key => combinedFilters[key as keyof MovieFilters]).length === 0) {
             return movies;
         }
-        return filterMovies(movies, filters);
-    }, [movies, filters]);
+        return filterMovies(movies, combinedFilters);
+    }, [movies, filters, searchText]);
 
     // Memoize grouped movies for SectionList
     const groupedMovies = useMemo(() => {
@@ -53,9 +55,20 @@ export default function HomeScreen() {
         }));
     }, [filteredMovies]);
 
-    // Memoize active filter count
+    // Memoize active filter count (excluding search text)
     const activeFilterCount = useMemo(() => {
-        return Object.values(filters).filter(v => v !== undefined && v !== '').length;
+        try {
+            const count = Object.entries(filters).filter(([key, value]) => {
+                if (key === 'searchText') return false;
+                if (value === undefined || value === null || value === '') return false;
+                // For numeric values, check if > 0
+                if (typeof value === 'number') return value > 0;
+                return true;
+            }).length;
+            return Number(count) || 0;
+        } catch (e) {
+            return 0;
+        }
     }, [filters]);
 
     const applyFilters = useCallback((newFilters: MovieFilters) => {
@@ -131,6 +144,17 @@ export default function HomeScreen() {
                         </View>
                     )}
                 </TouchableOpacity>
+            </View>
+            
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    placeholder="Search movies, actors, directors..."
+                    placeholderTextColor="#999"
+                    clearButtonMode="while-editing"
+                />
             </View>
             
             <SectionList
@@ -227,6 +251,21 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 11,
         fontWeight: 'bold',
+    },
+    searchContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    searchInput: {
+        backgroundColor: '#f0f0f0',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: '#333',
     },
     loadingText: {
         marginTop: 12,
