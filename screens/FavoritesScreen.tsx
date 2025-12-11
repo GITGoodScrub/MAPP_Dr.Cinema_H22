@@ -1,23 +1,19 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
-import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Animated,
+    RefreshControl,
     SafeAreaView,
+    ScrollView,
     Share,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import DraggableFlatList, { OpacityDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
-    Animated,
-    RefreshControl,
-    ScrollView,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams, OpacityDecorator } from 'react-native-draggable-flatlist';
@@ -206,9 +202,8 @@ export default function FavoritesScreen() {
         } catch (error) {
             console.log('Error sharing favourite movies', error)
         }
-    }
+    };
 
-    const renderUnderlayLeft = () => (
     const renderUnderlayLeft = useCallback(() => (
         <View style={styles.underlayContainer}>
             <Ionicons name="trash-outline" size={36} color="white" />

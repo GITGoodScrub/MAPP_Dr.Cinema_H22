@@ -1,6 +1,3 @@
-import Review from '@/components/Movie/review';
-import * as Linking from 'expo-linking';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
     Dimensions,
@@ -13,6 +10,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import Review from '@/components/Movie/review';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
