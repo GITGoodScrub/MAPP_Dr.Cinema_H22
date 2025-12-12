@@ -37,11 +37,28 @@ export default function CinemaDetailScreen() {
         setLoading(true);
         try {
             const allMovies = await getMovies();
-            // Filter movies that are showing at this cinema
-            const cinemaMovies = allMovies.filter(movie =>
-                movie.showtimes.some(showtime => showtime.cinema.id === cinema.id)
-            );
-            setMovies(cinemaMovies);
+            
+            // Filter and deduplicate movies showing at this cinema
+            // Use title + year as the unique key since _id might not be reliable
+            const movieMap = new Map<string, Movie>();
+            
+            allMovies.forEach(movie => {
+                const hasShowtimeAtCinema = movie.showtimes.some(
+                    showtime => showtime.cinema.id === cinema.id
+                );
+                
+                if (hasShowtimeAtCinema) {
+                    // Create a unique key from title and year
+                    const uniqueKey = `${movie.title}-${movie.year}`;
+                    
+                    // Only add if we haven't seen this movie before
+                    if (!movieMap.has(uniqueKey)) {
+                        movieMap.set(uniqueKey, movie);
+                    }
+                }
+            });
+            
+            setMovies(Array.from(movieMap.values()));
             setHasLoaded(true);
         } catch (err) {
             console.error('Error loading cinema movies:', err);
@@ -187,13 +204,32 @@ export default function CinemaDetailScreen() {
                         <Text style={styles.loadingText}>Loading movies...</Text>
                     </View>
                 ) : movies.length > 0 ? (
-                    movies.map((movie) => (
-                        <MovieCard
-                            key={movie._id}
-                            movie={movie}
-                            onPress={handleMoviePress}
-                        />
-                    ))
+                    movies.map((movie) => {
+                        // Get showtimes for this cinema only
+                        const cinemaShowtime = movie.showtimes.find(
+                            st => st.cinema.id === cinema.id
+                        );
+                        
+                        return (
+                            <View key={movie._id} style={styles.movieCardWrapper}>
+                                <MovieCard
+                                    movie={movie}
+                                    onPress={handleMoviePress}
+                                />
+                                {cinemaShowtime && cinemaShowtime.schedule && cinemaShowtime.schedule.length > 0 && (
+                                    <View style={styles.showtimesContainer}>
+                                        <View style={styles.timeSlotsContainer}>
+                                            {cinemaShowtime.schedule.map((slot, idx) => (
+                                                <View key={idx} style={styles.timeSlot}>
+                                                    <Text style={styles.timeText}>{slot.time}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    })
                 ) : (
                     <Text style={styles.noMoviesText}>No movies currently showing</Text>
                 )}
@@ -317,5 +353,36 @@ const styles = StyleSheet.create({
         color: '#999',
         textAlign: 'center',
         padding: 32,
+    },
+    movieCardWrapper: {
+        marginBottom: 16,
+    },
+    showtimesContainer: {
+        backgroundColor: '#fff',
+        padding: 12,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+        marginTop: -8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    timeSlotsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    timeSlot: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 4,
+    },
+    timeText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
     },
 });

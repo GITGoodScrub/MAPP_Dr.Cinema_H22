@@ -319,7 +319,7 @@ export default function MovieDetailScreen() {
                         <Text style={styles.sectionTitle}>Showtimes</Text>
                         {movie.showtimes.map((showtime, cinemaIndex) => (
                             <View key={cinemaIndex} style={styles.showtimeCard}>
-                                <Text style={styles.cinemaName}>{showtime.cinema_name}</Text>
+                                <Text style={styles.cinemaName}>{showtime.cinema.name}</Text>
                                 <View style={styles.timesContainer}>
                                     {showtime.schedule.map((slot, slotIndex) => (
                                         <TouchableOpacity

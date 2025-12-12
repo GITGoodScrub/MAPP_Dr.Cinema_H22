@@ -5,33 +5,38 @@ import { Movie } from './types';
  * Since a movie can be shown in multiple cinemas, it will appear in multiple groups
  */
 export const groupMoviesByCinema = (movies: Movie[]) => {
-    const grouped: { [cinemaName: string]: { cinemaId: number; movies: Movie[] } } = {};
+    const grouped: { [cinemaId: number]: { cinemaName: string; movies: Map<string, Movie> } } = {};
 
     movies.forEach(movie => {
         if (movie.showtimes && movie.showtimes.length > 0) {
             movie.showtimes.forEach(showtime => {
-                const cinemaName = showtime.cinema_name;
+                const cinemaName = showtime.cinema.name;
                 const cinemaId = showtime.cinema.id;
 
-                if (!grouped[cinemaName]) {
-                    grouped[cinemaName] = {
-                        cinemaId,
-                        movies: []
+                if (!grouped[cinemaId]) {
+                    grouped[cinemaId] = {
+                        cinemaName,
+                        movies: new Map()
                     };
                 }
 
-                // Add movie to this cinema's list
-                grouped[cinemaName].movies.push(movie);
+                // Use title + year as unique key to prevent duplicates
+                const movieKey = `${movie.title}-${movie.year}`;
+                
+                // Add movie to this cinema's list only if not already added
+                if (!grouped[cinemaId].movies.has(movieKey)) {
+                    grouped[cinemaId].movies.set(movieKey, movie);
+                }
             });
         }
     });
 
     // Convert to array and sort by cinema name
     return Object.entries(grouped)
-        .map(([cinemaName, data]) => ({
-            cinemaName,
-            cinemaId: data.cinemaId,
-            movies: data.movies
+        .map(([cinemaId, data]) => ({
+            cinemaName: data.cinemaName,
+            cinemaId: parseInt(cinemaId),
+            movies: Array.from(data.movies.values())
         }))
         .sort((a, b) => a.cinemaName.localeCompare(b.cinemaName));
 };

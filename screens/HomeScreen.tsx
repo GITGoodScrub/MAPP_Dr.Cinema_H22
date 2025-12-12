@@ -47,13 +47,32 @@ export default function HomeScreen() {
     const groupedMovies = useMemo(() => {
         if (filteredMovies.length === 0) return [];
         
+        // If searching, show unique movies without cinema grouping
+        if (searchText.trim().length > 0) {
+            // Deduplicate movies by title + year
+            const uniqueMoviesMap = new Map<string, Movie>();
+            filteredMovies.forEach(movie => {
+                const key = `${movie.title}-${movie.year}`;
+                if (!uniqueMoviesMap.has(key)) {
+                    uniqueMoviesMap.set(key, movie);
+                }
+            });
+            
+            return [{
+                title: 'Search Results',
+                cinemaId: 0,
+                data: Array.from(uniqueMoviesMap.values())
+            }];
+        }
+        
+        // Otherwise group by cinema
         const grouped = groupMoviesByCinema(filteredMovies);
         return grouped.map(group => ({
             title: group.cinemaName,
             cinemaId: group.cinemaId,
             data: group.movies
         }));
-    }, [filteredMovies]);
+    }, [filteredMovies, searchText]);
 
     // Memoize active filter count (excluding search text)
     const activeFilterCount = useMemo(() => {
