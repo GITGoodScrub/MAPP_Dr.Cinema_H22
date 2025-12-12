@@ -113,7 +113,8 @@ export default function CinemaDetailScreen() {
         router.push({
             pathname: '/movie-detail' as any,
             params: {
-                movie: JSON.stringify(movie)
+                movie: JSON.stringify(movie),
+                cinemaId: cinema.id.toString()
             }
         });
     };

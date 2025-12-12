@@ -102,6 +102,7 @@ export default function MovieDetailScreen() {
     
     // Parse the movie object from params
     const movie: Movie = params.movie ? JSON.parse(params.movie as string) : null;
+    const cinemaId = params.cinemaId ? parseInt(params.cinemaId as string) : null;
     
     const isFav = movie ? favorites.some(f => f._id === movie._id) : false;
 
@@ -317,7 +318,9 @@ export default function MovieDetailScreen() {
                 {movie.showtimes && movie.showtimes.length > 0 && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Showtimes</Text>
-                        {movie.showtimes.map((showtime, cinemaIndex) => (
+                        {movie.showtimes
+                            .filter(showtime => !cinemaId || showtime.cinema.id === cinemaId)
+                            .map((showtime, cinemaIndex) => (
                             <View key={cinemaIndex} style={styles.showtimeCard}>
                                 <Text style={styles.cinemaName}>{showtime.cinema.name}</Text>
                                 <View style={styles.timesContainer}>
