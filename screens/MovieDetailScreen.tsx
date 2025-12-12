@@ -12,8 +12,7 @@ import {
     View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import * as WebBrowser from 'expo-web-browser';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import Review from '@/components/Movie/review';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +25,26 @@ import { addFavorite, removeFavorite } from '../store/favoritesSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 const { width } = Dimensions.get('window');
+
+// Function to extract YouTube video ID from various URL formats
+const extractYouTubeId = (url: string): string | null => {
+    if (!url) return null;
+    
+    // Handle different YouTube URL formats
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+        /^([a-zA-Z0-9_-]{11})$/, // Direct video ID
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    
+    return null;
+};
 
 // Function to get country flag emoji from country name
 const getCountryFlag = (country: string): string => {
@@ -72,13 +91,7 @@ export default function MovieDetailScreen() {
     const favorites = useAppSelector((state) => state.favorites.favorites);
 
     const [videoModalVisible, setVideoModalVisible] = useState(false);
-    const [currentTrailerUrl, setCurrentTrailerUrl] = useState<string | null>(null);
-    
-    const player = useVideoPlayer(currentTrailerUrl || '', (player) => {
-        if (currentTrailerUrl) {
-            player.play();
-        }
-    });
+    const [currentYouTubeId, setCurrentYouTubeId] = useState<string | null>(null);
 
     // sharing movies here
     const handleShareMovie = async () => {
@@ -145,13 +158,16 @@ export default function MovieDetailScreen() {
         }
         
         if (url && typeof url === 'string') {
-            // YouTube videos should open in browser
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                await WebBrowser.openBrowserAsync(url);
-            } else {
-                // For direct video URLs, use the video player
-                setCurrentTrailerUrl(url);
+            // Extract YouTube ID
+            const youtubeId = extractYouTubeId(url);
+            
+            if (youtubeId) {
+                // Open in-app YouTube player
+                setCurrentYouTubeId(youtubeId);
                 setVideoModalVisible(true);
+            } else {
+                // Fallback: If not a YouTube URL, could show an error or handle differently
+                console.log('Not a valid YouTube URL:', url);
             }
         } else {
             console.log('No valid trailer URL found:', trailer);
@@ -160,7 +176,7 @@ export default function MovieDetailScreen() {
 
     const closeVideoModal = () => {
         setVideoModalVisible(false);
-        setCurrentTrailerUrl(null);
+        setCurrentYouTubeId(null);
     };
 
     const handleTicketPress = (url: string) => {
@@ -413,12 +429,16 @@ export default function MovieDetailScreen() {
                             <Ionicons name="close" size={30} color="#fff" />
                         </TouchableOpacity>
                         
-                        {currentTrailerUrl && (
-                            <VideoView
-                                style={styles.video}
-                                player={player}
-                                allowsFullscreen
-                                allowsPictureInPicture
+                        {currentYouTubeId && (
+                            <YoutubePlayer
+                                height={250}
+                                play={true}
+                                videoId={currentYouTubeId}
+                                onChangeState={(state: string) => {
+                                    if (state === 'ended') {
+                                        // Optionally close modal when video ends
+                                    }
+                                }}
                             />
                         )}
                     </View>
@@ -727,14 +747,10 @@ const styles = StyleSheet.create({
     },
     videoModalContent: {
         width: width - 40,
-        aspectRatio: 16 / 9,
         backgroundColor: '#000',
         borderRadius: 12,
         overflow: 'hidden',
-    },
-    video: {
-        width: '100%',
-        height: '100%',
+        paddingTop: 40,
     },
     closeButton: {
         position: 'absolute',
